@@ -2,12 +2,12 @@ const express = require("express");
 const bodyParser = require("body-parser");
 // it exposes a middleware function which will eventually use by express middleware
 const { graphqlHTTP } = require("express-graphql");
-
 const { buildSchema } = require("graphql");
 
-const app = express();
+const Event = require("./models/event");
 
-const events = [];
+// connection file
+const { startServer, app } = require("./connection");
 
 app.use(bodyParser.json());
 
@@ -41,24 +41,38 @@ app.use(
     `),
     rootValue: {
       events: () => {
-        return events;
+        return Event.find()
+          .then((events) => {
+            console.log("events", events);
+            return events.map((event) => {
+              return { ...event._doc };
+            });
+          })
+          .catch((err) => {
+            throw err;
+          });
       },
       createEvent: (args) => {
-        const event = {
-          _id: Math.random().toString(),
+        const event = new Event({
           title: args.eventInput.title,
           description: args.eventInput.description,
           price: +args.eventInput.price,
-          date: args.eventInput.date,
-        };
-        events.push(event);
-        return event;
+          date: new Date(args.eventInput.date),
+        });
+        return event
+          .save()
+          .then((result) => {
+            console.log(result);
+            return { ...result._doc };
+          })
+          .catch((err) => {
+            console.log("err:", err);
+            throw err;
+          });
       },
     },
     graphiql: true,
   }),
 );
 
-app.listen(3000, () => {
-  console.log(`Server is listening on port: 3000`);
-});
+startServer();
